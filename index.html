@@ -152,6 +152,8 @@ input[type=password]::placeholder{letter-spacing:.5px;font-size:14px}
 .cw{position:fixed;inset:0;pointer-events:none;z-index:200;overflow:hidden}
 .cp{position:absolute;top:-20px;animation:cpf linear forwards}
 @keyframes cpf{to{transform:translateY(110vh) rotate(800deg);opacity:0}}
+.btn-reset{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:.75rem;padding:9px 16px;border-radius:9px;border:1.5px solid rgba(248,113,113,.3);background:rgba(248,113,113,.08);color:#FCA5A5;font-family:var(--fh);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;width:100%;transition:all .18s}
+.btn-reset:hover{background:rgba(248,113,113,.18);border-color:var(--r);color:var(--r)}
 @media(max-width:400px){.key{min-width:27px;height:32px;font-size:10px}.ll{font-size:18px}.lb{min-width:28px;height:44px}.btn-row .btn{min-width:120px}}
 </style>
 </head>
@@ -172,7 +174,10 @@ input[type=password]::placeholder{letter-spacing:.5px;font-size:14px}
       <button class="btn btn-c" onclick="startOnline()">🌐&nbsp;&nbsp;Crear partida online</button>
     </div>
     <div class="card" id="home-hist" style="display:none">
-      <div class="lbl">Historial de palabras</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <div class="lbl" style="margin-bottom:0">Historial de palabras</div>
+        <button class="btn btn-ol btn-sm" onclick="resetHistorial()" style="font-size:10px;padding:6px 12px;color:var(--r);border-color:rgba(248,113,113,.3)">🗑 Reiniciar</button>
+      </div>
       <div id="hist-list"></div>
     </div>
   </div>
@@ -329,7 +334,13 @@ input[type=password]::placeholder{letter-spacing:.5px;font-size:14px}
         <button class="btn btn-pk" id="btn-rematch" onclick="requestRematch()" style="display:none">⚡ Revancha</button>
       </div>
     </div>
-    <div class="card" id="r-hist" style="display:none;width:100%"><div class="lbl">Historial compartido</div><div id="r-hist-list"></div></div>
+    <div class="card" id="r-hist" style="display:none;width:100%">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <div class="lbl" style="margin-bottom:0">Historial compartido</div>
+        <button class="btn btn-ol btn-sm" onclick="resetHistorial()" style="font-size:10px;padding:6px 12px;color:var(--r);border-color:rgba(248,113,113,.3)">🗑 Reiniciar</button>
+      </div>
+      <div id="r-hist-list"></div>
+    </div>
   </div>
 </div>
 
@@ -387,6 +398,7 @@ let G = {
   modo:'local', rol:'', palabra:'', reveladas:[], errores:[],
   historial:[], timerSec:0, timerID:null,
   gameId:'', invitada:'', specSec:0, specTID:null, isRematch:false,
+  gameEnded:false,   /* ★ guard: evita que endGame se llame dos veces */
 };
 
 /* ════ CANVAS DE PARTÍCULAS ════ */
@@ -426,14 +438,71 @@ function loadHistory() {
   }
 }
 
+/* ════ ANTI-DUPLICADO: flag para evitar guardar dos veces la misma partida ════ */
+let _savingWord = false;
+
 async function saveToHistory(palabra, estado) {
+  /* Guard 1: si ya estamos guardando esta palabra, ignorar llamada doble */
+  if(_savingWord) return;
+  _savingWord = true;
+  setTimeout(()=>{ _savingWord=false; }, 3000);
+
+  /* Guard 2: no guardar si ya existe la misma palabra con el mismo estado en los últimos 10s */
+  const yaExiste = G.historial.some(h =>
+    (h.palabra||h.word||'') === palabra &&
+    (h.estado||h.status||'') === estado &&
+    (Date.now() - (h.ts||0)) < 10000
+  );
+  if(yaExiste){ _savingWord=false; return; }
+
   const entry = { palabra, estado, fecha: new Date().toLocaleDateString('es'), ts: Date.now() };
+
   if(db){
-    try{ await db.ref('ahorcado_history').push(entry); }catch(e){}
+    /*
+     * Con Firebase activo: SOLO push a Firebase.
+     * El listener on('value') ya actualiza G.historial automaticamente.
+     * NO hacer G.historial.push() aqui — eso causaba el duplicado.
+     */
+    try{
+      await db.ref('ahorcado_history').push(entry);
+    } catch(e){
+      /* Firebase falló: fallback local */
+      if(!G.historial.some(h=>(h.palabra||h.word||'')===palabra)){
+        G.historial.push(entry);
+        try{ localStorage.setItem('ahorcado-v6', JSON.stringify(G.historial)); }catch(ex){}
+        renderHistorial();
+      }
+    }
+  } else {
+    /* Sin Firebase: solo guardar si la palabra no existe ya */
+    if(!G.historial.some(h=>(h.palabra||h.word||'')===palabra)){
+      G.historial.push(entry);
+      try{ localStorage.setItem('ahorcado-v6', JSON.stringify(G.historial)); }catch(e){}
+      renderHistorial();
+    }
   }
-  G.historial.push(entry);
-  try{ localStorage.setItem('ahorcado-v6', JSON.stringify(G.historial)); }catch(e){}
-  renderHistorial();
+  _savingWord = false;
+}
+
+/* ════ REINICIAR HISTORIAL ════ */
+async function resetHistorial(){
+  showConfirmToast(
+    '🗑 ¿Borrar todo el historial?',
+    'Se eliminarán todas las palabras jugadas. Esta acción no se puede deshacer.',
+    async () => {
+      G.historial = [];
+      if(db){ try{ await db.ref('ahorcado_history').remove(); }catch(e){} }
+      localStorage.removeItem('ahorcado-v6');
+      renderHistorial();
+    }
+  );
+}
+
+function showConfirmToast(title, sub, onConfirm){
+  showToast(title, sub, [
+    { label:'✓ Sí, borrar', cls:'btn-pk', cb:()=>{ hideToast(); onConfirm(); }},
+    { label:'Cancelar',     cls:'btn-ol', cb:()=> hideToast() },
+  ]);
 }
 
 /* ★ VALIDACIÓN ANTI-REPETICIÓN: verifica en Firebase + local */
@@ -454,12 +523,32 @@ async function checkWordExists(palabra) {
 
 function renderHistorial() {
   const hc=document.getElementById('home-hist'),rc=document.getElementById('r-hist');
-  const tiene=G.historial.length>0;
+
+  /* Deduplicar por palabra antes de renderizar (última entrada gana) */
+  const map = new Map();
+  G.historial.forEach(h => {
+    const key = (h.palabra||h.word||'').toLowerCase();
+    if(!key) return;
+    const prev = map.get(key);
+    if(!prev || (h.ts||0) > (prev.ts||0)) map.set(key, h);
+  });
+  const unique = [...map.values()].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,15);
+
+  const tiene = unique.length > 0;
   if(hc)hc.style.display=tiene?'block':'none';
   if(rc)rc.style.display=tiene?'block':'none';
-  const sorted=[...G.historial].sort((a,b)=>(b.ts||0)-(a.ts||0)).slice(0,12);
-  const html=sorted.map(h=>`<div class="hrow"><span class="hw">${h.palabra||h.word||''}</span><span class="htg ${(h.estado||h.status)==='Adivinada'?'htg-y':'htg-n'}">${h.estado||h.status||''}</span></div>`).join('');
-  ['hist-list','r-hist-list'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=html||'<p style="font-size:13px;color:var(--d)">Sin partidas aún.</p>';});
+
+  const resetBtn = `<button class="btn btn-reset" onclick="resetHistorial()" title="Borrar todo el historial">🗑 Reiniciar palabras</button>`;
+  const rows = unique.map(h=>`<div class="hrow">
+    <span class="hw">${h.palabra||h.word||''}</span>
+    <span class="htg ${(h.estado||h.status)==='Adivinada'?'htg-y':'htg-n'}">${h.estado||h.status||''}</span>
+  </div>`).join('');
+  const html = tiene ? rows + resetBtn : '';
+
+  ['hist-list','r-hist-list'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.innerHTML=html||'<p style="font-size:13px;color:var(--d)">Sin partidas aún.</p>';
+  });
 }
 
 /* ════ NAVEGACIÓN ════ */
@@ -685,6 +774,7 @@ function stopSpecTimer(){if(G.specTID){clearInterval(G.specTID);G.specTID=null;}
 
 /* ════ JUEGO — P2 ════ */
 function initGame(){
+  G.gameEnded=false;  /* ★ reset guard para nueva partida */
   G.reveladas=Array(G.palabra.length).fill(false);G.errores=[];G.timerSec=0;
   document.getElementById('gm').innerHTML='';document.getElementById('gi').value='';
   buildKB();renderGame();resetHangmanGame();
@@ -795,6 +885,9 @@ function updTimer(){const el=document.getElementById('gtimer');if(!el)return;con
 
 /* ════ FIN DEL JUEGO ════ */
 async function endGame(won){
+  /* ★ Guard: evitar que se llame dos veces (doble Enter, doble click, etc.) */
+  if(G.gameEnded) return;
+  G.gameEnded = true;
   stopTimer();
   const estado=won?'Adivinada':'No adivinada';
 
