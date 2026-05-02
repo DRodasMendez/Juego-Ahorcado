@@ -148,11 +148,6 @@ input[type=password]::placeholder{letter-spacing:.5px;font-size:14px}
 .sbox{background:rgba(255,255,255,.04);border:1px solid var(--edge);border-radius:10px;padding:.75rem;text-align:center}
 .sv{font-family:var(--fh);font-size:20px;color:var(--c)}
 .slbl{font-size:9px;color:var(--d);letter-spacing:1px;margin-top:2px;text-transform:uppercase}
-/* Setup */
-.setup-step{display:flex;align-items:flex-start;gap:.75rem;padding:.75rem;background:rgba(255,255,255,.03);border-radius:10px;border:1px solid rgba(255,255,255,.07)}
-.setup-num{flex-shrink:0;width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--vd),var(--c));font-family:var(--fh);font-size:12px;font-weight:900;color:#000;display:flex;align-items:center;justify-content:center}
-.setup-txt{font-size:13px;color:var(--s);line-height:1.6}
-.setup-txt strong{color:var(--c)}
 /* Confetti */
 .cw{position:fixed;inset:0;pointer-events:none;z-index:200;overflow:hidden}
 .cp{position:absolute;top:-20px;animation:cpf linear forwards}
@@ -166,21 +161,6 @@ input[type=password]::placeholder{letter-spacing:.5px;font-size:14px}
   <div class="logo">
     <div class="logo-title">⚡ AHORCADO</div>
     <div class="logo-sub">Compiladores · Sección B · Proyecto 1 · v6</div>
-  </div>
-
-  <!-- SETUP: Firebase no configurado -->
-  <div id="s-setup" class="screen">
-    <div class="al al-w" style="text-align:center">⚠ Firebase no configurado — el modo online funciona entre pestañas del mismo navegador</div>
-    <div class="card card-glow" style="display:flex;flex-direction:column;gap:.75rem">
-      <div class="lbl">Activar online real (dispositivos distintos)</div>
-      <div class="setup-step"><div class="setup-num">1</div><div class="setup-txt">Ve a <strong>console.firebase.google.com</strong> → inicia sesión → crea un proyecto.</div></div>
-      <div class="setup-step"><div class="setup-num">2</div><div class="setup-txt">En el proyecto: <strong>Realtime Database</strong> → Crear base de datos → Iniciar en <strong>modo prueba</strong>.</div></div>
-      <div class="setup-step"><div class="setup-num">3</div><div class="setup-txt">Configuración ⚙ → Tus apps → <strong>&lt;/&gt; Web</strong> → Registrar → copia el objeto <code style="color:var(--c)">firebaseConfig</code>.</div></div>
-      <div class="setup-step"><div class="setup-num">4</div><div class="setup-txt">Abre este archivo HTML → busca <strong>FB_CONFIG</strong> al inicio del script → pega tus valores.</div></div>
-      <div class="setup-step"><div class="setup-num">5</div><div class="setup-txt">Sube el archivo a <strong>GitHub Pages</strong> o <strong>Netlify</strong> (gratis) para jugar entre dispositivos.</div></div>
-      <div class="al al-i" style="font-size:12px">💡 Sin Firebase: funciona perfecto en modo local (dos pestañas del mismo navegador).</div>
-    </div>
-    <button class="btn btn-v" onclick="show('home')">Entendido → Jugar en local</button>
   </div>
 
   <!-- HOME -->
@@ -312,7 +292,9 @@ input[type=password]::placeholder{letter-spacing:.5px;font-size:14px}
     <div class="card" style="padding:1rem">
       <div class="lbl" style="margin-bottom:.5rem">O adivina la palabra completa</div>
       <div class="guess-row">
-        <input type="text" id="gi" placeholder="Escribe la palabra..." autocomplete="off" onkeydown="if(event.key==='Enter')guessWord()"/>
+        <input type="text" id="gi" placeholder="Escribe la palabra..." autocomplete="off"
+               onkeydown="if(event.key==='Enter')guessWord(); validateGuessKey(event);"
+               oninput="filterGuessInput(this)"/>
         <button class="btn btn-v btn-sm" onclick="guessWord()">→</button>
       </div>
       <div id="gm" style="margin-top:8px"></div>
@@ -343,10 +325,9 @@ input[type=password]::placeholder{letter-spacing:.5px;font-size:14px}
       <div class="stat-grid" id="rstat"></div>
       <div id="rst" style="width:100%"></div>
       <div class="btn-row">
-        <button class="btn btn-v" onclick="playAgain()">🔄 Nueva partida</button>
+        <button class="btn btn-v" onclick="playAgain()">🔄 Jugar de nuevo</button>
         <button class="btn btn-pk" id="btn-rematch" onclick="requestRematch()" style="display:none">⚡ Revancha</button>
       </div>
-      <button class="btn btn-ol" onclick="goHome()">🏠 Menú principal</button>
     </div>
     <div class="card" id="r-hist" style="display:none;width:100%"><div class="lbl">Historial compartido</div><div id="r-hist-list"></div></div>
   </div>
@@ -371,14 +352,14 @@ input[type=password]::placeholder{letter-spacing:.5px;font-size:14px}
    ║  2. Configuración ⚙ → Tus apps → Web → firebaseConfig   ║
    ╚═══════════════════════════════════════════════════════════╝ */
 const FB_CONFIG = {
-  apiKey: "AIzaSyAuiEwcRHNZzb4-HnvOtQPWIK1AKNKw2RQ",
-  authDomain: "ahorcado-80f6e.firebaseapp.com",
-  projectId: "ahorcado-80f6e",
-  storageBucket: "ahorcado-80f6e.firebasestorage.app",
+  apiKey:            "AIzaSyAuiEwcRHNZzb4-HnvOtQPWIK1AKNKw2RQ",
+  authDomain:        "ahorcado-80f6e.firebaseapp.com",
+  databaseURL:       "https://ahorcado-80f6e-default-rtdb.firebaseio.com",
+  projectId:         "ahorcado-80f6e",
+  storageBucket:     "ahorcado-80f6e.firebasestorage.app",
   messagingSenderId: "4135745753",
-  appId: "1:4135745753:web:0aea6e2b73c39137b7a6c8",
-  measurementId: "G-MFHCVJE2V",
-  databaseURL: "https://ahorcado-80f6e-default-rtdb.firebaseio.com" 
+  appId:             "1:4135745753:web:0aea6e2b73c39137b7a6c8",
+  measurementId:     "G-MFHCVJE2V",
 };
 
 /* ── Firebase init ── */
@@ -501,10 +482,7 @@ function goCreate(modo,isRematch=false){
   show('create');
   setTimeout(()=>document.getElementById('wi').focus(),400);
 }
-function startOnline(){
-  if(!FB_OK){ show('setup'); return; }
-  goCreate('online');
-}
+function startOnline(){ goCreate('online'); }
 
 /* ════ FIREBASE — LISTENERS ════ */
 function attachGL(gameId, handler){
@@ -744,8 +722,51 @@ function guessLetter(l){
     renderGame();syncState();if(G.errores.length>=MAX)endGame(false);
   }
 }
+/* ════ VALIDACIÓN DE ENTRADA ════
+ *
+ * Se bloquean números y caracteres especiales en tiempo real.
+ * Solo se permiten letras a-z, á, é, í, ó, ú, ü, ñ.
+ */
+function validateGuessKey(e){
+  /* Permitir teclas de control: Backspace, Delete, ArrowKeys, Tab, Enter */
+  if(['Backspace','Delete','ArrowLeft','ArrowRight','Tab','Enter'].includes(e.key))return;
+  if(/[0-9]/.test(e.key)){
+    e.preventDefault();
+    const msg=document.getElementById('gm');
+    msg.innerHTML='<div class="al al-w">⚠ Los números no son válidos. Solo ingresa letras.</div>';
+    setTimeout(()=>{if(msg.innerHTML.includes('números'))msg.innerHTML='';},2500);
+  } else if(!/^[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]$/.test(e.key)){
+    e.preventDefault();
+    const msg=document.getElementById('gm');
+    msg.innerHTML='<div class="al al-w">⚠ Los caracteres especiales no son válidos. Solo letras.</div>';
+    setTimeout(()=>{if(msg.innerHTML.includes('especiales'))msg.innerHTML='';},2500);
+  }
+}
+function filterGuessInput(el){
+  /* Eliminar cualquier caracter inválido que se haya pegado */
+  const clean=el.value.replace(/[^a-záéíóúüñA-ZÁÉÍÓÚÜÑ]/g,'');
+  if(clean!==el.value){
+    el.value=clean;
+    const msg=document.getElementById('gm');
+    msg.innerHTML='<div class="al al-w">⚠ Solo se permiten letras (sin números ni símbolos).</div>';
+    setTimeout(()=>{if(msg.innerHTML.includes('Solo'))msg.innerHTML='';},2500);
+  }
+}
+
 function guessWord(){
-  const inp=document.getElementById('gi'),att=inp.value.trim().toLowerCase(),msg=document.getElementById('gm');inp.value='';if(!att)return;
+  const inp=document.getElementById('gi'),att=inp.value.trim().toLowerCase(),msg=document.getElementById('gm');
+
+  /* ★ Validar caracteres inválidos */
+  if(!att){inp.value='';return;}
+  if(/[0-9]/.test(inp.value.trim())){
+    msg.innerHTML='<div class="al al-w">⚠ Los números no son válidos. Solo ingresa letras.</div>';
+    inp.value=''; return;
+  }
+  if(/[^a-záéíóúüñ]/i.test(inp.value.trim())){
+    msg.innerHTML='<div class="al al-w">⚠ Los caracteres especiales no son válidos. Solo ingresa letras.</div>';
+    inp.value=''; return;
+  }
+  inp.value='';
   if(att===G.palabra){G.reveladas=G.reveladas.map(()=>true);renderGame();endGame(true);}
   else{
     G.errores.push('['+att+']');const idx=G.errores.length-1;if(idx<PARTS_G.length)document.getElementById(PARTS_G[idx])?.classList.add('on');
